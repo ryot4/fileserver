@@ -14,6 +14,7 @@ import (
 type Config struct {
 	listenAddress string
 	documentRoot  string
+	showDotFiles  bool
 }
 
 const version = "0.0.1"
@@ -23,6 +24,7 @@ func main() {
 
 	flag.StringVar(&config.listenAddress, "l", "0.0.0.0:8080", "Address to listen on")
 	flag.StringVar(&config.documentRoot, "d", ".", "Directory to serve")
+	flag.BoolVar(&config.showDotFiles, "a", false, "Do not hide dotfiles")
 	printVersion := flag.Bool("v", false, "Print the version and exit")
 	flag.Parse()
 
@@ -50,8 +52,15 @@ func checkDirectory(path string) error {
 }
 
 func newServer(config *Config) *http.Server {
+	var fs http.FileSystem
+	if config.showDotFiles {
+		fs = http.Dir(config.documentRoot)
+	} else {
+		fs = dotFileHidingFs{http.Dir(config.documentRoot)}
+	}
+
 	mux := http.NewServeMux()
-	mux.Handle("/", &LoggingHandler{http.FileServer(http.Dir(config.documentRoot))})
+	mux.Handle("/", &LoggingHandler{http.FileServer(fs)})
 	return &http.Server{Addr: config.listenAddress, Handler: mux}
 }
 
